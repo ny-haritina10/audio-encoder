@@ -13,25 +13,22 @@ public class WavPositionBasedDecoder {
     public String decode(String wavPath, List<Integer> samplePositions) 
         throws Exception 
     {
-        // Read the WAV file
         AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(new File(wavPath));
         byte[] audioBytes = audioInputStream.readAllBytes();
         audioInputStream.close();
         
-        // Validate positions
         if (samplePositions.size() < 32) {
             throw new Exception("Position list too short to contain message length");
         }
         
-        // Extract bits from specified sample positions
+        // extract bits from specified sample positions
         StringBuilder binary = new StringBuilder();
         for (int sampleIndex : samplePositions) {
             int byteIndex = sampleIndex * 2; // 16-bit samples = 2 bytes each
-            if (byteIndex + 1 >= audioBytes.length) {
-                throw new Exception("Sample position out of bounds: " + sampleIndex);
-            }
+            if (byteIndex + 1 >= audioBytes.length) 
+            { throw new Exception("Sample position out of bounds: " + sampleIndex); }
             
-            // Get the 16-bit sample (little-endian)
+            // get the 16-bit sample (little-endian)
             byte[] sampleBytes = new byte[]{audioBytes[byteIndex], audioBytes[byteIndex + 1]};
             short sample = ByteBuffer.wrap(sampleBytes).order(ByteOrder.LITTLE_ENDIAN).getShort();
             
@@ -40,7 +37,6 @@ public class WavPositionBasedDecoder {
             binary.append(bit);
         }
         
-        // Get message length and validate
         long messageLength = getMessageLength(binary.toString());
         long requiredBits = 32 + messageLength * 8;
         if (binary.length() < requiredBits) {

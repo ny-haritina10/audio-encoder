@@ -15,51 +15,46 @@ import mg.itu.random.SamplePositionRandomizer;
 
 public class WavPositionBasedEncoder {
     
-    public List<Integer> encode(String inputWavPath, String message, String outputWavPath) throws Exception {
-        // Read the input WAV file
+    public List<Integer> encode(String inputWavPath, String message, String outputWavPath) 
+        throws Exception 
+    {
         AudioInputStream audioInputStream = AudioSystem.getAudioInputStream(new File(inputWavPath));
         AudioFormat format = audioInputStream.getFormat();
         
-        // Validate format (must be PCM, 16-bit samples)
         if (format.getEncoding() != AudioFormat.Encoding.PCM_SIGNED || format.getSampleSizeInBits() != 16) {
             throw new Exception("Only 16-bit PCM WAV files are supported");
         }
         
-        // Read all samples into a byte array
+        // read samples into a byte array
         byte[] audioBytes = audioInputStream.readAllBytes();
         audioInputStream.close();
         
-        // Convert message to binary
         String binaryMessage = messageToBinary(message);
         int requiredBits = binaryMessage.length();
         
-        // Calculate total number of samples
+        // total number of samples
         int numSamples = audioBytes.length / (format.getSampleSizeInBits() / 8);
         
-        // Generate random sample positions
         SamplePositionRandomizer randomizer = new SamplePositionRandomizer();
         List<Integer> samplePositions = randomizer.generateRandomPositions(numSamples, requiredBits);
         
-        // Modify samples at specified positions
+        // modify samples at specified positions
         for (int i = 0; i < binaryMessage.length(); i++) {
             int sampleIndex = samplePositions.get(i);
-            int byteIndex = sampleIndex * 2; // 16-bit samples = 2 bytes each
+            int byteIndex = sampleIndex * 2; 
             
-            // Get the 16-bit sample (little-endian)
+            // get the 16-bit sample (little-endian)
             byte[] sampleBytes = new byte[]{audioBytes[byteIndex], audioBytes[byteIndex + 1]};
             short sample = ByteBuffer.wrap(sampleBytes).order(ByteOrder.LITTLE_ENDIAN).getShort();
             
-            // Hide bit in LSB
+            // hide bit in LSB
             sample = (short) ((sample & 0xFFFE) | (binaryMessage.charAt(i) - '0'));
             
-            // Write back the modified sample
+            // write back the modified sample
             ByteBuffer.wrap(audioBytes, byteIndex, 2).order(ByteOrder.LITTLE_ENDIAN).putShort(sample);
         }
         
-        // Write the modified audio to a new WAV file
-        writeWavFile(audioBytes, outputWavPath, format);
-        
-        // Return the sample positions for decoding
+        writeWavFile(audioBytes, outputWavPath, format);        
         return samplePositions;
     }
     
