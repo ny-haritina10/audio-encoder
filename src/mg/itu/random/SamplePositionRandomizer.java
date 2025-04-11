@@ -28,7 +28,6 @@ public class SamplePositionRandomizer {
         return positions.subList(0, requiredPositions);
     }
 
-    // Fisher-Yates shuffle
     private void shuffle(List<Integer> list) {
         int n = list.size();
         for (int i = n - 1; i > 0; i--) {

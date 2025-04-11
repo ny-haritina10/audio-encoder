@@ -11,7 +11,7 @@ import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 
-import mg.itu.random.SamplePositionRandomizer;
+import mg.itu.sequence.SampleSequenceGenerator;
 
 public class WavPositionBasedEncoder {
     
@@ -25,40 +25,58 @@ public class WavPositionBasedEncoder {
             throw new Exception("Only 16-bit PCM WAV files are supported");
         }
         
-        // read samples into a byte array
+        // Read samples into a byte array
         byte[] audioBytes = audioInputStream.readAllBytes();
         audioInputStream.close();
         
         String binaryMessage = messageToBinary(message);
         int requiredBits = binaryMessage.length();
         
-        // total number of samples
+        // Total number of samples
         int numSamples = audioBytes.length / (format.getSampleSizeInBits() / 8);
         
-        SamplePositionRandomizer randomizer = new SamplePositionRandomizer();
-        List<Integer> samplePositions = randomizer.generateRandomPositions(numSamples, requiredBits);
+        // Use SampleSequenceGenerator instead of SamplePositionRandomizer
+        SampleSequenceGenerator sequenceGen = new SampleSequenceGenerator(4); // Default step, can be parameterized
+        List<Integer> samplePositions = sequenceGen.generatePositionsFromSequence(numSamples, requiredBits);
         
-        // modify samples at specified positions
+        // Encode using the sequence-based positions
+        encodeWithPositions(audioBytes, binaryMessage, samplePositions, format, outputWavPath);
+        
+        return samplePositions;
+    }
+    
+    public void encodeWithPositions(byte[] audioBytes, String binaryMessage, List<Integer> samplePositions, 
+                                   AudioFormat format, String outputWavPath) 
+        throws Exception 
+    {
+        if (samplePositions.size() < binaryMessage.length()) {
+            throw new Exception("Not enough sample positions provided");
+        }
+        
+        // Modify samples at specified positions
         for (int i = 0; i < binaryMessage.length(); i++) {
             int sampleIndex = samplePositions.get(i);
             int byteIndex = sampleIndex * 2; 
             
-            // get the 16-bit sample (little-endian)
+            if (byteIndex + 1 >= audioBytes.length) {
+                throw new Exception("Sample position out of bounds: " + sampleIndex);
+            }
+            
+            // Get the 16-bit sample (little-endian)
             byte[] sampleBytes = new byte[]{audioBytes[byteIndex], audioBytes[byteIndex + 1]};
             short sample = ByteBuffer.wrap(sampleBytes).order(ByteOrder.LITTLE_ENDIAN).getShort();
             
-            // hide bit in LSB
+            // Hide bit in LSB
             sample = (short) ((sample & 0xFFFE) | (binaryMessage.charAt(i) - '0'));
             
-            // write back the modified sample
+            // Write back the modified sample
             ByteBuffer.wrap(audioBytes, byteIndex, 2).order(ByteOrder.LITTLE_ENDIAN).putShort(sample);
         }
         
-        writeWavFile(audioBytes, outputWavPath, format);        
-        return samplePositions;
+        writeWavFile(audioBytes, outputWavPath, format);
     }
     
-    private String messageToBinary(String message) {
+    public static String messageToBinary(String message) {
         StringBuilder binary = new StringBuilder();
         String lengthBinary = String.format("%32s", Long.toBinaryString(message.length())).replace(' ', '0');
         binary.append(lengthBinary);
